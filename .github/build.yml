@@ -1,0 +1,49 @@
+name: Build utild
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build-kindle:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - kindle_target: kindlepw2
+            toolchain_arch: arm-kindlepw2-linux-gnueabi
+          - kindle_target: kindlehf
+            toolchain_arch: arm-kindlehf-linux-gnueabihf
+
+    steps:
+      - name: Download toolchain (${{ matrix.kindle_target }})
+        run: |
+          wget -q https://github.com/KindleModding/koxtoolchain/releases/latest/download/${{ matrix.kindle_target }}.tar.gz -O - | tar -xzf - -C ~
+
+      - uses: actions/checkout@v4
+        with:
+          repository: KindleModding/kindle-sdk
+          submodules: recursive
+          path: kindle-sdk
+
+      - name: "Setup kindle-sdk (${{ matrix.kindle_target }})"
+        run: |
+          sudo apt-get install -y zlib1g-dev libarchive-dev nettle-dev curl aria2c
+          sh ./kindle-sdk/gen-sdk.sh ${{ matrix.kindle_target }}
+
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: build (${{ matrix.kindle_target }})
+        run: |
+          sudo apt-get install meson
+          meson setup --cross-file ~/x-tools/${{ matrix.toolchain_arch }}/meson-crosscompile.txt builddir_${{ matrix.kindle_target }}
+          meson compile -C builddir_${{ matrix.kindle_target }}
+          ~/x-tools/${{ matrix.toolchain_arch }}/bin/${{ matrix.toolchain_arch }}-strip builddir_${{ matrix.kindle_target }}/src/utild
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: utild-${{ matrix.kindle_target }}
+          path: builddir_${{ matrix.kindle_target }}/src/utild
