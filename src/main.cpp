@@ -1,21 +1,22 @@
 #include "lipc.h"
+#include "lipc/IntHandler.h"
 #include "lipc/StringHandler.h"
+#include "version.h"
+#include <array>
+#include <cstdio>
+#include <cstring>
 #include <format>
 #include <getopt.h>
+#include <memory>
 #include <signal.h>
+#include <stdexcept>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <syslog.h>
 #include <unistd.h>
-#include <cstring>
-#include <string>
-#include <memory>
-#include <stdexcept>
-#include <array>
-#include <cstdio>
-#include "version.h"
 
 #define APP_PREFIX "com.kindlemodding.utild"
 namespace utild {
@@ -64,7 +65,7 @@ static void skeleton_daemon() {
 
 } // namespace utild
 
-std::string exec(const std::string& cmd) {
+std::string exec(const std::string &cmd) {
     std::array<char, 128> buffer;
     std::string result;
 
@@ -125,47 +126,55 @@ int main(int argc, char *argv[]) {
     utild::global_handle = handle;
 
     utild::lipc::StringHandler<std::nullptr_t> exit_handler("exit");
-    exit_handler.setSetter(
-        [](utild::lipc::StringHandler<std::nullptr_t> *_this, LIPC *_lipc, utild::lipc::LIPCString* _value) -> LIPCcode {
+    exit_handler
+        .setSetter([](utild::lipc::StringHandler<std::nullptr_t> *_this, LIPC *_lipc,
+                      utild::lipc::LIPCString *_value) -> LIPCcode {
             utild::keep_running = 0;
             return LIPC_OK;
-        }
-    )->setGetter([](utild::lipc::StringHandler<std::nullptr_t> *_this, LIPC *_lipc, utild::lipc::LIPCString* value) -> LIPCcode {
-        return value->set("Write into this property to exit utild");
-    })->subscribe(handle);
+        })
+        ->setGetter([](utild::lipc::StringHandler<std::nullptr_t> *_this, LIPC *_lipc,
+                       utild::lipc::LIPCString *value) -> LIPCcode {
+            return value->set("Write into this property to exit utild");
+        })
+        ->subscribe(handle);
 
     utild::lipc::StringHandler<std::string> cmd_handler("runCMD");
 
     cmd_handler
-        .setSetter([](utild::lipc::StringHandler<std::string> *_this, LIPC *_lipc, utild::lipc::LIPCString* value) -> LIPCcode {
-           _this->setData(exec(value->toString()));
-           return LIPC_OK;
-        })->setGetter([](utild::lipc::StringHandler<std::string> *_this, LIPC *_lipc, utild::lipc::LIPCString* value) -> LIPCcode {
+        .setSetter([](utild::lipc::StringHandler<std::string> *_this, LIPC *_lipc,
+                      utild::lipc::LIPCString *value) -> LIPCcode {
+            _this->setData(exec(value->toString()));
+            return LIPC_OK;
+        })
+        ->setGetter([](utild::lipc::StringHandler<std::string> *_this, LIPC *_lipc,
+                       utild::lipc::LIPCString *value) -> LIPCcode {
             return value->set(_this->getData().empty() ? "No output yet." : _this->getData().c_str());
-        })->subscribe(handle);
+        })
+        ->subscribe(handle);
 
     utild::lipc::StringHandler<std::nullptr_t> info_handler("info");
 
     info_handler
-        .setGetter([](utild::lipc::StringHandler<std::nullptr_t> *_this, LIPC *_lipc, utild::lipc::LIPCString* value) -> LIPCcode {
-
-            std::string dirty_status = std::string(GIT_IS_DIRTY).empty() ? "" : " (dirty)";
-
-            // The std::format string combining all the information
-            // Note: We combine GIT_CURRENT_SHORT and dirty_status before passing to format
-            // because std::format doesn't directly support conditional formatting within the string.
-            std::string formatted_info = std::format(
-                "Build Info: Branch: {}, Commit: {}{}, Built On: {}",
-                GIT_BRANCH_NAME,
-                GIT_CURRENT_SHORT,
-                dirty_status,
-                BUILD_TIME
-            );
+        .setGetter([](utild::lipc::StringHandler<std::nullptr_t> *_this, LIPC *_lipc,
+                      utild::lipc::LIPCString *value) -> LIPCcode {
+            std::string formatted_info =
+                std::format("Build Info: Branch: {}, Commit: {}{}, Built On: {}", GIT_BRANCH_NAME, GIT_CURRENT_SHORT,
+                            std::string(GIT_IS_DIRTY).empty() ? "" : " (dirty)", BUILD_TIME);
             return value->set(formatted_info);
-        })->subscribe(handle);
+        })
+        ->subscribe(handle);
 
-
-
+    utild::lipc::IntHandler<int> test_number("num");
+    test_number
+        .setSetter([](utild::lipc::IntHandler<int> *_this, LIPC *_lipc, int *value) -> LIPCcode {
+            _this->setData(*value);
+            return LIPC_OK;
+        })
+        ->setGetter([](utild::lipc::IntHandler<int> *_this, LIPC *_lipc, int *value) -> LIPCcode {
+            *value = _this->getData();
+            return LIPC_OK;
+        })
+        ->subscribe(handle);
 
     while (utild::keep_running) {
         sleep(1);
