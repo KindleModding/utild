@@ -8,6 +8,12 @@
 #include <sys/types.h>
 #include <syslog.h>
 #include <unistd.h>
+#include <cstring>
+#include <string>
+#include <memory>
+#include <stdexcept>
+#include <array>
+#include <cstdio>
 
 #define APP_PREFIX "com.kindlemodding.utild"
 namespace utild {
@@ -56,6 +62,22 @@ static void skeleton_daemon() {
 
 } // namespace utild
 
+std::string exec(const std::string& cmd) {
+    std::array<char, 128> buffer;
+    std::string result;
+
+    std::unique_ptr<FILE, decltype(&pclose)> pipe(popen(cmd.c_str(), "r"), pclose);
+    if (!pipe) {
+        throw std::runtime_error("popen() failed!");
+    }
+
+    while (fgets(buffer.data(), buffer.size(), pipe.get()) != nullptr) {
+        result += buffer.data();
+    }
+
+    return result;
+}
+
 int main(int argc, char *argv[]) {
     bool run_as_daemon = true;
 
@@ -102,18 +124,27 @@ int main(int argc, char *argv[]) {
 
     utild::lipc::StringHandler<std::nullptr_t> exit_handler("exit");
     exit_handler.setSetter(
-        [](utild::lipc::StringHandler<std::nullptr_t> *_this, LIPC *lipc, std::string value) -> LIPCcode {
+        [](utild::lipc::StringHandler<std::nullptr_t> *_this, LIPC *lipc, std::string value, void* _data) -> LIPCcode {
             utild::keep_running = 0;
             return LIPC_OK;
         }
-    )->subscribe(handle);
+    )->setGetter([](utild::lipc::StringHandler<std::nullptr_t> *_this, LIPC *lipc, char* value, void* _data) -> LIPCcode {
+        std::string message = "Write into this property to exit utild";
+        // *value = reinterpret_cast<char*>(malloc(message.size() + 1));
+        strcpy(value, message.c_str());
+        return LIPC_OK;
+    })->subscribe(handle);
 
     utild::lipc::StringHandler<std::string> cmd_handler("runCMD");
 
     cmd_handler
-        .setSetter([](utild::lipc::StringHandler<std::string> *_this, LIPC *lipc, std::string value) -> LIPCcode {
-           printf("Received set runCMD: %s\n", value.c_str());
+        .setSetter([](utild::lipc::StringHandler<std::string> *_this, LIPC *lipc, std::string value, void* _data) -> LIPCcode {
+           _this->setData(exec(value));
            return LIPC_OK;
+        })->setGetter([](utild::lipc::StringHandler<std::string> *_this, LIPC *lipc, char* value, void* _data) -> LIPCcode {
+            strcpy(value, _this->getData().empty() ? "No output yet." : _this->getData().c_str());
+            _this->setData("");
+            return LIPC_OK;
         })->subscribe(handle);
 
     while (utild::keep_running) {
@@ -122,7 +153,7 @@ int main(int argc, char *argv[]) {
 
     // Cleanup
     LipcClose(handle);
-    printf("JBUtil shutting down.\n");
+    printf("utild shutting down.\n");
 
     return 0;
 }
