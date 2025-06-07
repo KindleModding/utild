@@ -1,5 +1,6 @@
 #include "lipc.h"
 #include "lipc/StringHandler.h"
+#include <format>
 #include <getopt.h>
 #include <signal.h>
 #include <stdio.h>
@@ -14,6 +15,7 @@
 #include <stdexcept>
 #include <array>
 #include <cstdio>
+#include "version.h"
 
 #define APP_PREFIX "com.kindlemodding.utild"
 namespace utild {
@@ -141,6 +143,29 @@ int main(int argc, char *argv[]) {
         })->setGetter([](utild::lipc::StringHandler<std::string> *_this, LIPC *_lipc, utild::lipc::LIPCString* value) -> LIPCcode {
             return value->set(_this->getData().empty() ? "No output yet." : _this->getData().c_str());
         })->subscribe(handle);
+
+    utild::lipc::StringHandler<std::nullptr_t> info_handler("info");
+
+    info_handler
+        .setGetter([](utild::lipc::StringHandler<std::nullptr_t> *_this, LIPC *_lipc, utild::lipc::LIPCString* value) -> LIPCcode {
+
+            std::string dirty_status = std::string(GIT_IS_DIRTY).empty() ? "" : " (dirty)";
+
+            // The std::format string combining all the information
+            // Note: We combine GIT_CURRENT_SHORT and dirty_status before passing to format
+            // because std::format doesn't directly support conditional formatting within the string.
+            std::string formatted_info = std::format(
+                "Build Info: Branch: {}, Commit: {}{}, Built On: {}",
+                GIT_BRANCH_NAME,
+                GIT_CURRENT_SHORT,
+                dirty_status,
+                BUILD_TIME
+            );
+            return value->set(formatted_info);
+        })->subscribe(handle);
+
+
+
 
     while (utild::keep_running) {
         sleep(1);

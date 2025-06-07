@@ -1,7 +1,6 @@
 #pragma once
 #include "lipc.h"
 #include "lipc/IHandler.h"
-#include <cstdint>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -16,7 +15,7 @@ class LIPCString {
     LIPCString(char *value, void *data) : value(value), data(data) {
     }
     LIPCcode check(std::string value) {
-        if (value.length() + 1 > *(int *)data) {
+        if (value.length() + 1 > *(size_t *)data) {
             *(int *)data = value.length() + 1;
             return LIPC_ERROR_BUFFER_TOO_SMALL;
         }

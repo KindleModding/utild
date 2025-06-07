@@ -1,0 +1,10 @@
+
+#pragma once
+
+#define GIT_BRANCH_NAME "@GIT_BRANCH_NAME@"
+
+#define GIT_CURRENT_SHORT "@GIT_CURRENT_SHORT@"
+
+#define BUILD_TIME "@BUILD_TIME@"
+
+#define GIT_IS_DIRTY "@GIT_IS_DIRTY@"
