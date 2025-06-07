@@ -26,10 +26,13 @@ jobs:
           repository: KindleModding/kindle-sdk
           submodules: recursive
           path: kindle-sdk
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y zlib1g-dev libarchive-dev nettle-dev curl aria2 meson
 
       - name: "Setup kindle-sdk (${{ matrix.kindle_target }})"
         run: |
-          sudo apt-get install -y zlib1g-dev libarchive-dev nettle-dev curl aria2
           sh ./kindle-sdk/gen-sdk.sh ${{ matrix.kindle_target }}
 
       - uses: actions/checkout@v4
@@ -38,7 +41,6 @@ jobs:
 
       - name: build (${{ matrix.kindle_target }})
         run: |
-          sudo apt-get install meson
           meson setup --cross-file ~/x-tools/${{ matrix.toolchain_arch }}/meson-crosscompile.txt builddir_${{ matrix.kindle_target }}
           meson compile -C builddir_${{ matrix.kindle_target }}
           ~/x-tools/${{ matrix.toolchain_arch }}/bin/${{ matrix.toolchain_arch }}-strip builddir_${{ matrix.kindle_target }}/src/utild
