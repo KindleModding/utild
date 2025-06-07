@@ -4,23 +4,57 @@
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
 #include <functional>
 #include <string>
+
 namespace utild::lipc {
 template <typename T> class StringHandler;
 
-template <typename T>
-using SimpleStringSetterCB = LIPCcode(StringHandler<T> *_this, LIPC *lipc, std::string value, void *data);
+class LIPCString {
+  public:
+    LIPCString(char *value, void *data) : value(value), data(data) {
+    }
+    LIPCcode check(std::string value) {
+        if (value.length() + 1 > *(int *)data) {
+            *(int *)data = value.length() + 1;
+            return LIPC_ERROR_BUFFER_TOO_SMALL;
+        }
+        return LIPC_OK;
+    }
+
+    LIPCcode set(const std::string value) {
+        auto result = check(value);
+        if (result != LIPC_OK)
+            return result;
+        strcpy(this->value, value.c_str());
+        return LIPC_OK;
+    }
+
+    char *get() {
+        return value;
+    }
+
+    std::string toString() {
+        return std::string(value);
+    }
+
+  private:
+    char *value;
+    void *data;
+};
 
 template <typename T>
-using SimpleStringGetterCB = LIPCcode(StringHandler<T> *_this, LIPC *lipc, char *value, void *data);
+using StringCallback = LIPCcode(StringHandler<T> *_this, LIPC *lipc, LIPCString *value);
+
 
 template <typename T> struct Data {
-    Data() : handler(nullptr), data(nullptr) {}
+    Data() : handler(nullptr), data(nullptr) {
+    }
     void *data;
     StringHandler<T> *handler;
 };
-inline std::unordered_map<std::string, void*> g_string_handlers;
+inline std::unordered_map<std::string, void *> g_string_handlers;
 template <typename T> class StringHandler : public IHandler {
   public:
     StringHandler(const std::string &command) : command(command) {
@@ -29,26 +63,26 @@ template <typename T> class StringHandler : public IHandler {
 
     static LIPCcode propGetCallback(LIPC *lipc, const char *property, void *value, void *data) {
 
-        auto _this = static_cast<StringHandler<T>*>(g_string_handlers[property]);
+        auto _this = static_cast<StringHandler<T> *>(g_string_handlers[property]);
         if (_this->getter_cb) {
-            return _this->getter_cb(_this, lipc, (char *)value, data);
+            return _this->getter_cb(_this, lipc, new LIPCString((char*)value, data));
         }
         return LIPC_ERROR_NO_SUCH_PROPERTY;
     }
 
     static LIPCcode propSetCallback(LIPC *lipc, const char *property, void *value, void *data) {
 
-        auto _this = static_cast<StringHandler<T>*>(g_string_handlers[property]);
+        auto _this = static_cast<StringHandler<T> *>(g_string_handlers[property]);
         if (_this->setter_cb) {
-            return _this->setter_cb(_this, lipc, reinterpret_cast<char *>(value), data);
+            return _this->setter_cb(_this, lipc, new LIPCString((char*)value, data));
         }
         return LIPC_ERROR_NO_SUCH_PROPERTY;
     }
-    StringHandler *setGetter(std::function<SimpleStringGetterCB<T>> callback) {
+    StringHandler *setGetter(std::function<StringCallback<T>> callback) {
         this->getter_cb = callback;
         return this;
     }
-    StringHandler *setSetter(std::function<SimpleStringSetterCB<T>> callback) {
+    StringHandler *setSetter(std::function<StringCallback<T>> callback) {
         this->setter_cb = callback;
         return this;
     }
@@ -68,8 +102,8 @@ template <typename T> class StringHandler : public IHandler {
   private:
     std::string command;
     T data;
-    std::function<SimpleStringGetterCB<T>> getter_cb;
-    std::function<SimpleStringSetterCB<T>> setter_cb;
+    std::function<StringCallback<T>> getter_cb;
+    std::function<StringCallback<T>> setter_cb;
 };
 
 } // namespace utild::lipc

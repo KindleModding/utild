@@ -124,27 +124,22 @@ int main(int argc, char *argv[]) {
 
     utild::lipc::StringHandler<std::nullptr_t> exit_handler("exit");
     exit_handler.setSetter(
-        [](utild::lipc::StringHandler<std::nullptr_t> *_this, LIPC *lipc, std::string value, void* _data) -> LIPCcode {
+        [](utild::lipc::StringHandler<std::nullptr_t> *_this, LIPC *_lipc, utild::lipc::LIPCString* _value) -> LIPCcode {
             utild::keep_running = 0;
             return LIPC_OK;
         }
-    )->setGetter([](utild::lipc::StringHandler<std::nullptr_t> *_this, LIPC *lipc, char* value, void* _data) -> LIPCcode {
-        std::string message = "Write into this property to exit utild";
-        // *value = reinterpret_cast<char*>(malloc(message.size() + 1));
-        strcpy(value, message.c_str());
-        return LIPC_OK;
+    )->setGetter([](utild::lipc::StringHandler<std::nullptr_t> *_this, LIPC *_lipc, utild::lipc::LIPCString* value) -> LIPCcode {
+        return value->set("Write into this property to exit utild");
     })->subscribe(handle);
 
     utild::lipc::StringHandler<std::string> cmd_handler("runCMD");
 
     cmd_handler
-        .setSetter([](utild::lipc::StringHandler<std::string> *_this, LIPC *lipc, std::string value, void* _data) -> LIPCcode {
-           _this->setData(exec(value));
+        .setSetter([](utild::lipc::StringHandler<std::string> *_this, LIPC *_lipc, utild::lipc::LIPCString* value) -> LIPCcode {
+           _this->setData(exec(value->toString()));
            return LIPC_OK;
-        })->setGetter([](utild::lipc::StringHandler<std::string> *_this, LIPC *lipc, char* value, void* _data) -> LIPCcode {
-            strcpy(value, _this->getData().empty() ? "No output yet." : _this->getData().c_str());
-            _this->setData("");
-            return LIPC_OK;
+        })->setGetter([](utild::lipc::StringHandler<std::string> *_this, LIPC *_lipc, utild::lipc::LIPCString* value) -> LIPCcode {
+            return value->set(_this->getData().empty() ? "No output yet." : _this->getData().c_str());
         })->subscribe(handle);
 
     while (utild::keep_running) {
