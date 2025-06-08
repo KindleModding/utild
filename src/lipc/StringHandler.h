@@ -1,11 +1,9 @@
 #pragma once
-#include "lipc.h"
 #include "lipc/IHandler.h"
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <functional>
-#include <string>
 
 namespace utild::lipc {
 template <typename T> class StringHandler;
@@ -46,13 +44,6 @@ class LIPCString {
 template <typename T>
 using StringCallback = LIPCcode(StringHandler<T> *_this, LIPC *lipc, LIPCString *value);
 
-
-template <typename T> struct Data {
-    Data() : handler(nullptr), data(nullptr) {
-    }
-    void *data;
-    StringHandler<T> *handler;
-};
 inline std::unordered_map<std::string, void *> g_string_handlers;
 template <typename T> class StringHandler : public IHandler {
   public:

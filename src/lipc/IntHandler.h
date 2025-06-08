@@ -2,7 +2,6 @@
 
 #include "lipc/IHandler.h"
 #include <functional>
-#include <string>
 
 namespace utild::lipc {
 template <typename T> class IntHandler;
